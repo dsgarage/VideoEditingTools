@@ -2,13 +2,11 @@
 
 overwrite=0
 mode=""
-random_position=0
 
 # オプションを取得
-while getopts "rf:o1:2:3:4:" option; do
+while getopts "rfo" option; do
     case $option in
-        r) mode="random"
-           random_position="$OPTARG";;
+        r) mode="random";;
         f) mode="fixed";;
         o) overwrite=1;;
     esac
@@ -25,27 +23,26 @@ do
 
     # オプションに応じた画像の切り出し
     if [ "$mode" = "random" ]; then
-        if [ "$random_position" -ge 1 ] && [ "$random_position" -le 4 ]; then
-            # 動画を4等分し、指定されたポジションの前後3秒のランダム位置を計算
-            let "position = $total_duration / 4 * $random_position"
-            let "start_position = $position - 3"
-            let "end_position = $position + 3"
-            let "random_time = $start_position + $RANDOM % ($end_position - $start_position)"
-            output_file="RC$(printf "%02d" $random_position).jpg"
-        else
-            # 通常のランダム切り出し
-            let "random_time = $RANDOM % ($total_duration - 30) + 30"
-            output_file="RC_random.jpg"
-        fi
-        if [ -f "$output_file" ] && [ $overwrite -eq 0 ]; then
-            echo "File $output_file exists, skipping"
-            continue
-        fi
-        ffmpeg -y -ss $random_time -i "$file" -frames:v 1 "$output_file"
+        for i in {1..4}; do
+            random_time=$((30 + RANDOM % (total_duration - 30)))
+            output_file="RC$(printf "%02d" $i).jpg"
+            if [ -f "$output_file" ] && [ $overwrite -eq 0 ]; then
+                echo "File $output_file exists, skipping"
+                continue
+            fi
+            ffmpeg -y -ss $random_time -i "$file" -frames:v 1 "$output_file"
+        done
     elif [ "$mode" = "fixed" ]; then
-        # 4等分した位置で画像を切り出し
+        let "quarter_duration = $total_duration / 4"
+        let "half_duration = $quarter_duration * 2"
+        let "three_quarter_duration = $quarter_duration * 3"
+
         for i in 1 2 3 4; do
-            let "time = $total_duration / 4 * $i"
+            if [ $i -eq 1 ]; then time=$quarter_duration
+            elif [ $i -eq 2 ]; then time=$half_duration
+            elif [ $i -eq 3 ]; then time=$three_quarter_duration
+            else time=$total_duration; fi
+
             output_file="RC$(printf "%02d" $i).jpg"
             if [ -f "$output_file" ] && [ $overwrite -eq 0 ]; then
                 echo "File $output_file exists, skipping"
