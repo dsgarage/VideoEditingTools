@@ -2,12 +2,16 @@
 
 overwrite=0
 mode=""
+start_frame=0
+end_frame=0
 
 # オプションを取得
-while getopts "rfo" option; do
+while getopts "rfsoe" option; do
     case $option in
         r) mode="random";;
         f) mode="fixed";;
+        s) start_frame=1;;
+        e) end_frame=1;;
         o) overwrite=1;;
     esac
 done
@@ -21,9 +25,20 @@ do
     total_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file")
     total_duration=${total_duration%.*}
 
+    # 最初のフレームを書き出し
+    if [ $start_frame -eq 1 ]; then
+        ffmpeg -y -ss 1 -i "$file" -frames:v 1 "RC01.jpg"
+    fi
+
     # オプションに応じた画像の切り出し
     if [ "$mode" = "random" ]; then
         for i in {1..4}; do
+            if [ $start_frame -eq 1 ] && [ $i -eq 1 ]; then
+                continue
+            fi
+            if [ $end_frame -eq 1 ] && [ $i -eq 4 ]; then
+                continue
+            fi
             random_time=$((30 + RANDOM % (total_duration - 30)))
             output_file="RC$(printf "%02d" $i).jpg"
             if [ -f "$output_file" ] && [ $overwrite -eq 0 ]; then
@@ -38,6 +53,12 @@ do
         let "three_quarter_duration = $quarter_duration * 3"
 
         for i in 1 2 3 4; do
+            if [ $start_frame -eq 1 ] && [ $i -eq 1 ]; then
+                continue
+            fi
+            if [ $end_frame -eq 1 ] && [ $i -eq 4 ]; then
+                continue
+            fi
             if [ $i -eq 1 ]; then time=$quarter_duration
             elif [ $i -eq 2 ]; then time=$half_duration
             elif [ $i -eq 3 ]; then time=$three_quarter_duration
@@ -50,6 +71,11 @@ do
             fi
             ffmpeg -y -ss $time -i "$file" -frames:v 1 "$output_file"
         done
+    fi
+
+    # 最後のフレームを書き出し
+    if [ $end_frame -eq 1 ]; then
+        ffmpeg -y -ss $(($total_duration - 1)) -i "$file" -frames:v 1 "RC04.jpg"
     fi
 done
 
